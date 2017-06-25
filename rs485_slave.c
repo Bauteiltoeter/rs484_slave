@@ -3,6 +3,7 @@
 #include <string.h>
 #include "rs485_slave.h"
 #include "uart.h"
+#include "rs485_configuration.h"
 
 uint16_t stored_id EEMEM;
 uint16_t id=0xFFFF;
@@ -12,14 +13,12 @@ uint32_t autoreset=0;
 static void process_byte(uint8_t b);
 static void process_new_id(uint16_t new_id);
 static uint16_t calc_checksum(uint8_t *data, uint16_t length);
-static void process_message(uint16_t msg_id, uint8_t length, uint8_t* data);
-static void answer_message(uint16_t msg_id);
 
-msg_complete_update_t msgstore_complete_update;
+
 
 void rs485_init(void)
 {
-    uart1_init( UART_BAUD_SELECT(RS485_BAUD,F_CPU) );
+    RS485_init( UART_BAUD_SELECT(RS485_BAUD,F_CPU) );
     RS485_CTL_DDR |= (1<<RS485_RX) | (1<<RS485_TX);
     rs485_rx();
 
@@ -58,11 +57,8 @@ void rs485_run(void)
         rs485_rx();
 
 
-
-    unsigned int c= uart1_getc();
-
-
-    if (! ( c & UART_NO_DATA) )
+    unsigned int c;
+    while (!((c= RS485_getc()) & UART_NO_DATA))
     {
         if(c & UART_FRAME_ERROR)
         {
@@ -196,9 +192,9 @@ static void process_byte(uint8_t b)
                 process_message(msg_id,length,data);
 
                 rs485_tx_autoreset(2);
-                uart1_putc(0xAA);
-                uart1_putc(data[length+0]);
-                uart1_putc(data[length+1]);
+                RS485_putc(0xAA);
+                RS485_putc(data[length+0]);
+                RS485_putc(data[length+1]);
 
                 state= WAITING_FOR_START;
             }
@@ -258,7 +254,7 @@ static void process_new_id(uint16_t new_id)
     rs485_tx_autoreset(2);
     for(uint8_t i=5; i < 11; i++)
     {
-        uart1_putc(buffer[i]);
+        RS485_putc(buffer[i]);
     }
 
 }
@@ -275,35 +271,4 @@ static uint16_t calc_checksum(uint8_t *data, uint16_t length)
     return sum;
 }
 
-static void process_message(uint16_t msg_id, uint8_t length, uint8_t* data)
-{
-    char t[50];
-    uart_puts("Processing Message ");
 
-    sprintf(t,"No %u, length: %u\r\n",msg_id, length);
-    uart_puts(t);
-
-    if(msg_id == 2)
-    {
-        memcpy(msgstore_complete_update.characters,data,80);
-        for(uint8_t i=0; i < 4; i++)
-        {
-            msgstore_complete_update.dots[i] = ((uint32_t)data[80   +i*4])<<24;
-            msgstore_complete_update.dots[i] |= ((uint32_t)data[81  +i*4])<<16;
-            msgstore_complete_update.dots[i] |= ((uint32_t)data[82  +i*4])<<8;
-            msgstore_complete_update.dots[i] |= ((uint32_t)data[83  +i*4])<<0;
-        }
-
-    }
-
-}
-
-static void answer_message(uint16_t msg_id)
-{
-    if(msg_id==2)
-    {
-        rs485_tx_autoreset(2);
-        uart1_putc(20);
-        uart1_putc(4);
-    }
-}
