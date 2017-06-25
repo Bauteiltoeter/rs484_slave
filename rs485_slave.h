@@ -13,6 +13,6 @@ void rs485_tx_autoreset(uint8_t ms);
 void rs485_run(void);
 
 extern void process_message(uint16_t msg_id, uint8_t length, uint8_t* data);
-extern void answer_message(uint16_t msg_id);
+extern void answer_message(uint16_t msg_id, uint8_t* buffer);
 
 #endif

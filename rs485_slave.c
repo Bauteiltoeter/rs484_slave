@@ -174,7 +174,11 @@ static void process_byte(uint8_t b)
                     else
                     {
                         uart_puts("have to send\r\n");
-                        answer_message(msg_id);
+                        uint8_t buffer[length];
+                        answer_message(msg_id, buffer);
+                        rs485_tx_autoreset(1);
+                        for(uint8_t i=0; i < length; i++)
+                            RS485_putc(buffer[i]);
                         state=WAITING_FOR_START;
                     }
                 }
